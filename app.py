@@ -1,4 +1,4 @@
-# app.py (Final Folder Search Fix)
+# app.py (Signed URL Fix)
 
 import os
 import re
@@ -6,6 +6,7 @@ import json
 import io
 import cloudinary
 import cloudinary.api
+import cloudinary.utils  # Import the utils library for signing URLs
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -43,6 +44,7 @@ else:
 def download_pdfs_from_cloudinary():
     """
     Connects to Cloudinary, fetches all PDFs from a specific folder, and saves them locally.
+    This version generates signed URLs to prevent 401 errors.
     """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
@@ -50,7 +52,6 @@ def download_pdfs_from_cloudinary():
 
     print("Connecting to Cloudinary to download PDFs...")
     try:
-        # --- MODIFIED: Using a more robust search expression to find files in a specific folder ---
         expression = 'folder=pdfs'
         print(f"Using Cloudinary search expression: '{expression}'")
         
@@ -64,12 +65,23 @@ def download_pdfs_from_cloudinary():
             return False
 
         for resource in resources.get('resources', []):
-            file_url = resource['secure_url']
-            filename = resource['filename'] + '.' + resource.get('format', 'pdf')
+            public_id = resource['public_id']
+            file_format = resource.get('format', 'pdf')
+            
+            # --- MODIFIED: Generate a signed URL for download ---
+            # This creates a URL with a temporary authentication token.
+            download_url = cloudinary.utils.cloudinary_url(
+                public_id, 
+                resource_type="raw", 
+                sign_url=True,
+                format=file_format
+            )[0]
+
+            filename = resource['filename'] + '.' + file_format
             filepath = os.path.join(PDF_DIRECTORY, filename)
             
             print(f"Downloading {filename}...")
-            response = requests.get(file_url, stream=True)
+            response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
             with open(filepath, 'wb') as f:
