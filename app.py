@@ -37,10 +37,10 @@ def download_pdfs_from_cloudinary():
     print("Connecting to Cloudinary to download PDFs...")
     try:
         resources = cloudinary.api.resources(
-            type="upload", resource_type="raw", prefix="pdfs/", max_results=500
+            type="upload", resource_type="raw", prefix="pdfs", max_results=500
         )
         if not resources.get('resources'):
-            print("Warning: No PDF resources found in Cloudinary folder 'pdfs/'.")
+            print("Warning: No PDF resources found in Cloudinary folder 'pdfs'.")
             return False
         for resource in resources.get('resources', []):
             file_url = resource['secure_url']
