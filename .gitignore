@@ -1,0 +1,9 @@
+# Ignore the folder containing all the PDF documents
+/docs/
+
+# Ignore the generated index file
+pdf_index.json
+
+# Ignore Python's cache files
+__pycache__/
+*.pyc

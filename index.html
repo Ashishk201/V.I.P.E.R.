@@ -1,0 +1,372 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Search</title>
+    <!-- Custom Styles - No Tailwind CSS -->
+    <style>
+        /* --- Base and Custom Properties --- */
+        :root {
+            --navy-blue: #1b3055;
+            --light-background: #eef2f9;
+            --text-primary: #1f2937;
+            --text-secondary: #4b5563;
+        }
+
+        body {
+            font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", "Lucida Sans", Arial, sans-serif;
+            background-color: var(--light-background);
+            overflow-x: hidden;
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        /* --- Layout Containers --- */
+        .main-container {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        header.main-header,
+        div.search-container,
+        main#resultsArea,
+        footer.main-footer {
+            width: 100%;
+            text-align: center;
+        }
+
+        header.main-header {
+            max-width: 64rem; /* max-w-5xl */
+            margin-bottom: 2rem; /* mb-8 */
+            margin-top: 1rem; /* mt-4 */
+        }
+        
+        div.search-container {
+            max-width: 48rem; /* max-w-3xl */
+            margin-bottom: 2.5rem; /* mb-10 */
+        }
+
+        main#resultsArea {
+            max-width: 80rem; /* max-w-7xl */
+        }
+
+        footer.main-footer {
+            padding-top: 2rem; /* py-8 */
+            padding-bottom: 2rem;
+            margin-top: auto;
+        }
+
+        /* --- Decorative Elements --- */
+        .aurora-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(at 27% 37%, hsla(215, 98%, 61%, 0.2) 0px, transparent 50%), 
+                        radial-gradient(at 97% 21%, hsla(19, 98%, 61%, 0.2) 0px, transparent 50%), 
+                        radial-gradient(at 82% 99%, hsla(334, 98%, 61%, 0.2) 0px, transparent 50%), 
+                        radial-gradient(at 18% 78%, hsla(245, 98%, 61%, 0.2) 0px, transparent 50%);
+            filter: blur(80px);
+        }
+
+        .glass-panel {
+            background-color: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 1rem; /* rounded-2xl */
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); /* shadow-xl */
+            padding: 1.5rem; /* p-6 */
+        }
+
+        /* --- Typography --- */
+        h1.main-title {
+            font-size: 2.25rem; /* text-4xl */
+            line-height: 2.5rem;
+            font-weight: 800; /* font-extrabold */
+            color: var(--navy-blue);
+            letter-spacing: -0.025em; /* tracking-tight */
+        }
+
+        p.subtitle {
+            margin-top: 0.75rem; /* mt-3 */
+            font-size: 1.125rem; /* text-lg */
+            line-height: 1.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* --- Form Elements --- */
+        form#searchForm .form-wrapper {
+            display: flex;
+            align-items: center;
+            border: 2px solid var(--navy-blue);
+            border-radius: 9999px; /* rounded-full */
+            overflow: hidden;
+        }
+
+        input#rollNumberInput {
+            width: 100%;
+            padding: 1rem 1.5rem; /* px-6 py-4 */
+            font-size: 1.125rem; /* text-lg */
+            background-color: transparent;
+            border: none;
+            outline: none;
+            color: var(--navy-blue);
+        }
+
+        input#rollNumberInput::placeholder {
+            color: #6b7280; /* placeholder-gray-500 */
+        }
+
+        button.search-button {
+            background-color: var(--navy-blue);
+            color: white;
+            font-weight: 700; /* font-bold */
+            font-size: 1.125rem; /* text-lg */
+            padding: 1rem 2rem; /* px-8 py-4 */
+            margin: 0.25rem; /* m-1 */
+            border-radius: 9999px; /* rounded-full */
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button.search-button:hover {
+            opacity: 0.9;
+            transform: scale(1.05);
+        }
+        
+        /* --- Results Area --- */
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 2rem; /* gap-8 */
+        }
+
+        .result-card {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .result-card-header {
+            padding: 1rem; /* p-4 */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .result-card-header h3 {
+            font-weight: 700; /* font-bold */
+            color: var(--navy-blue);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            text-align: left;
+        }
+        
+        .result-card-header p {
+            font-size: 0.875rem; /* text-sm */
+            line-height: 1.25rem;
+            color: var(--text-secondary);
+            text-align: left;
+        }
+
+        .embed-container {
+            flex-grow: 1;
+            padding: 0.5rem; /* p-2 */
+        }
+
+        .pdf-embed {
+            width: 100%;
+            height: 70vh;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+
+        /* --- Loader and Status --- */
+        .loader {
+            border: 4px solid rgba(27, 48, 85, 0.2);
+            border-radius: 50%;
+            border-top: 4px solid var(--navy-blue);
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- Responsive Design --- */
+        @media (min-width: 640px) { /* sm breakpoint */
+            .main-container { padding: 1.5rem; }
+            h1.main-title { font-size: 3rem; line-height: 1; } /* sm:text-5xl */
+        }
+
+        @media (min-width: 1024px) { /* lg breakpoint */
+            .main-container { padding: 2rem; }
+            .results-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } /* lg:grid-cols-2 */
+        }
+
+    </style>
+</head>
+<body>
+    <div class="aurora-background"></div>
+
+    <div class="main-container">
+        
+        <header class="main-header">
+            <h1 class="main-title">
+                Information Portal for Vetter Assistance🚀
+            </h1>
+            <p class="subtitle">
+                Instantly locate documents by Roll Number.
+            </p>
+        </header>
+
+        <div class="search-container glass-panel">
+            <form id="searchForm">
+                <div class="form-wrapper">
+                    <input type="text" id="rollNumberInput" placeholder="Enter Roll Number...">
+                    <button type="submit" class="search-button">
+                        Search
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <main id="resultsArea">
+            <div id="statusMessage" class="glass-panel" style="padding: 2rem; text-align:center; color: #6b7280;">
+                Your search results will appear here.
+            </div>
+        </main>
+        
+        <footer class="main-footer">
+            <button id="rebuildIndexBtn" style="font-size: 0.875rem; color: #4b5563; background: none; border: none; cursor: pointer;">
+                Update Search Index
+            </button>
+            <div id="rebuildStatus" style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--navy-blue);"></div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            const searchFormElement = document.getElementById('searchForm');
+            const rollNumberInputElement = document.getElementById('rollNumberInput');
+            const resultsAreaElement = document.getElementById('resultsArea');
+            const rebuildIndexButtonElement = document.getElementById('rebuildIndexBtn');
+            const rebuildStatusElement = document.getElementById('rebuildStatus');
+
+            searchFormElement.addEventListener('submit', handleSearchSubmit);
+            rebuildIndexButtonElement.addEventListener('click', handleRebuildClick);
+
+            async function handleSearchSubmit(event) {
+                event.preventDefault();
+                const searchQuery = rollNumberInputElement.value.trim();
+                if (!searchQuery) {
+                    updateStatusMessage('Please provide a roll number to search.');
+                    return;
+                }
+                updateStatusMessage('<div style="display:flex; flex-direction:column; justify-content:center; align-items:center; gap:1rem;"><div class="loader"></div><span style="font-size:1.125rem; font-weight:500; color:var(--navy-blue);">Searching the archives...</span></div>');
+                try {
+                    const searchData = await fetchSearchResults(searchQuery);
+                    renderSearchResults(searchData);
+                } catch (error) {
+                    console.error('Search failed:', error);
+                    updateStatusMessage(`<strong>Search failed.</strong> Please ensure the Python server is running.`);
+                }
+            }
+
+            async function handleRebuildClick() {
+                rebuildStatusElement.textContent = 'Rebuilding index... This may take several minutes.';
+                rebuildStatusElement.style.color = 'var(--navy-blue)';
+                try {
+                    const response = await fetch('[http://127.0.0.1:5000/rebuild_index](http://127.0.0.1:5000/rebuild_index)', { cache: 'no-cache' });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'An unknown error occurred.');
+                    rebuildStatusElement.textContent = 'Index rebuilt successfully!';
+                    rebuildStatusElement.style.color = '#16a34a'; // green-600
+                } catch (error) {
+                    rebuildStatusElement.textContent = `Error rebuilding index: ${error.message}`;
+                    rebuildStatusElement.style.color = '#dc2626'; // red-600
+                }
+            }
+
+            async function fetchSearchResults(query) {
+                const response = await fetch(`http://127.0.0.1:5000/search?q=${encodeURIComponent(query)}`, { cache: 'no-cache' });
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                return response.json();
+            }
+
+            function updateStatusMessage(htmlContent) {
+                resultsAreaElement.innerHTML = '';
+                const statusDiv = document.createElement('div');
+                statusDiv.id = 'statusMessage';
+                statusDiv.className = 'glass-panel';
+                statusDiv.style.padding = '2rem';
+                statusDiv.style.textAlign = 'center';
+                statusDiv.innerHTML = htmlContent;
+                resultsAreaElement.appendChild(statusDiv);
+            }
+
+            function renderSearchResults(data) {
+                resultsAreaElement.innerHTML = '';
+                if (data.results && data.results.length > 0) {
+                    const header = createResultsHeader(data.results.length, data.query);
+                    resultsAreaElement.appendChild(header);
+                    const gridContainer = document.createElement('div');
+                    gridContainer.className = 'results-grid';
+                    data.results.forEach(result => {
+                        const resultCard = createResultCard(result);
+                        gridContainer.appendChild(resultCard);
+                    });
+                    resultsAreaElement.appendChild(gridContainer);
+                } else {
+                    updateStatusMessage(`No results found for "<strong>${data.query}</strong>". Please check the Roll Number and try again.`);
+                }
+            }
+
+            function createResultsHeader(count, query) {
+                const titleElement = document.createElement('h2');
+                titleElement.style.fontSize = '1.5rem';
+                titleElement.style.lineHeight = '2rem';
+                titleElement.style.fontWeight = '700';
+                titleElement.style.marginBottom = '2rem';
+                titleElement.style.textAlign = 'center';
+                titleElement.style.color = 'var(--navy-blue)';
+                titleElement.innerHTML = `Found ${count} result(s) for <span style="font-family:monospace; background-color:var(--navy-blue); color:white; padding: 0.25rem 0.75rem; border-radius: 0.5rem;">${query}</span>`;
+                return titleElement;
+            }
+
+            function createResultCard(result) {
+                const pdfUrl = `http://127.0.0.1:5000/docs/${encodeURIComponent(result.doc)}#page=${result.page}`;
+                const itemContainer = document.createElement('div');
+                itemContainer.className = 'glass-panel result-card';
+                const headerElement = document.createElement('div');
+                headerElement.className = 'result-card-header';
+                headerElement.innerHTML = `<h3 title="${result.doc}">${result.doc}</h3><p>Found on Page ${result.page}</p>`;
+                const embedContainer = document.createElement('div');
+                embedContainer.className = 'embed-container';
+                const embedElement = document.createElement('embed');
+                embedElement.setAttribute('src', pdfUrl);
+                embedElement.setAttribute('type', 'application/pdf');
+                embedElement.className = 'pdf-embed';
+                embedContainer.appendChild(embedElement);
+                itemContainer.appendChild(headerElement);
+                itemContainer.appendChild(embedContainer);
+                return itemContainer;
+            }
+        });
+    </script>
+</body>
+</html>
