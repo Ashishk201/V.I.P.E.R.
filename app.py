@@ -1,4 +1,4 @@
-# app.py (Final Version for Hosting)
+# app.py (Final Robust Version)
 
 import os
 import re
@@ -24,45 +24,88 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 # --- CLOUDINARY SETUP ---
-cloudinary.config(
-    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.environ.get('CLOUDINARY_API_KEY'),
-    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
-    secure=True
-)
+# Read credentials from environment variables
+cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
+api_key = os.environ.get('CLOUDINARY_API_KEY')
+api_secret = os.environ.get('CLOUDINARY_API_SECRET')
+
+# Add a check and log to ensure variables are loaded
+if not all([cloud_name, api_key, api_secret]):
+    print("FATAL ERROR: Cloudinary environment variables are not set. Please check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in Render.")
+else:
+    print(f"Cloudinary configured for cloud_name: {cloud_name}")
+    cloudinary.config(
+        cloud_name=cloud_name,
+        api_key=api_key,
+        api_secret=api_secret,
+        secure=True
+    )
 
 def download_pdfs_from_cloudinary():
+    """
+    Connects to Cloudinary, fetches all PDFs, and saves them to the local PDF_DIRECTORY.
+    This version is more robust and has better logging.
+    """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
+        print(f"Created temporary PDF directory at: {PDF_DIRECTORY}")
+
     print("Connecting to Cloudinary to download PDFs...")
     try:
+        # MODIFIED: Removed 'resource_type' to be more flexible.
+        # This will find any file type inside the 'pdfs/' folder.
         resources = cloudinary.api.resources(
-            type="upload", resource_type="raw", prefix="pdfs", max_results=500
+            type="upload",
+            prefix="pdfs",  # Make sure your PDFs are in a 'pdfs' folder in Cloudinary
+            max_results=500
         )
-        if not resources.get('resources'):
-            print("Warning: No PDF resources found in Cloudinary folder 'pdfs'.")
+        
+        num_found = len(resources.get('resources', []))
+        print(f"Cloudinary API call successful. Found {num_found} resources in 'pdfs/' folder.")
+
+        if num_found == 0:
+            print("Warning: No files were found. Please ensure your files are uploaded to a folder named exactly 'pdfs' in your Cloudinary Media Library.")
             return False
+
         for resource in resources.get('resources', []):
             file_url = resource['secure_url']
-            filename = os.path.basename(resource['public_id']) + '.' + resource.get('format', 'pdf')
+            # Create a filename that includes the extension
+            filename = f"{resource['public_id']}.{resource.get('format', 'pdf')}"
+            # Remove the folder path from the filename
+            filename = os.path.basename(filename)
             filepath = os.path.join(PDF_DIRECTORY, filename)
+            
             print(f"Downloading {filename}...")
+            
             response = requests.get(file_url, stream=True)
             response.raise_for_status()
+
             with open(filepath, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
+            
+            print(f"Successfully downloaded {filename}.")
+        
         print("All PDFs downloaded successfully from Cloudinary.")
         return True
+
     except Exception as e:
         print(f"FATAL ERROR connecting to or downloading from Cloudinary: {e}")
         return False
 
+# --- CORE LOGIC (Functions are unchanged) ---
+
 def create_index():
     print("Starting PDF indexing process...")
-    if not os.path.exists(PDF_DIRECTORY): return None
+    if not os.path.exists(PDF_DIRECTORY):
+        print(f"Indexing failed: Directory '{PDF_DIRECTORY}' not found.")
+        return None
+    
     pdf_files = [f for f in os.listdir(PDF_DIRECTORY) if f.lower().endswith('.pdf')]
-    if not pdf_files: return {}
+    if not pdf_files:
+        print("Warning: No PDF files found in the temporary directory to index.")
+        return {}
+        
     index = {}
     for i, filename in enumerate(pdf_files):
         print(f"Processing file {i+1}/{len(pdf_files)}: {filename}...")
@@ -78,7 +121,9 @@ def create_index():
                     img = Image.open(io.BytesIO(img_data))
                     text_ocr = pytesseract.image_to_string(img) or ""
                     combined_text = f"{text_pypdf2}\n{text_pymupdf}\n{text_ocr}"
+                    
                     if not combined_text.strip(): continue
+                    
                     found_on_page = set(match.group(0).upper() for match in ROLL_NUMBER_REGEX.finditer(combined_text))
                     for roll_number in found_on_page:
                         if roll_number not in index: index[roll_number] = []
@@ -87,16 +132,21 @@ def create_index():
                             index[roll_number].append(location)
         except Exception as e:
             print(f"Error processing file {filename}: {e}")
+            
     with open(INDEX_FILE, 'w') as f: json.dump(index, f, indent=2)
     print(f"Indexing complete. Found {len(index)} unique roll numbers.")
     return index
 
+
 def load_index():
     if os.path.exists(INDEX_FILE):
+        print(f"Loading existing index from {INDEX_FILE}...")
         with open(INDEX_FILE, 'r') as f: return json.load(f)
+    print("No index file found. Creating a new one.")
     return create_index()
 
-# --- FLASK ROUTES ---
+# --- FLASK ROUTES (Unchanged) ---
+
 @app.route('/')
 def serve_index_page():
     return send_from_directory('.', 'index.html')
@@ -120,14 +170,16 @@ def rebuild_index_endpoint():
         pdf_index = create_index()
         if pdf_index is not None:
             return jsonify({"status": "success", "message": "Index rebuilt successfully from Cloudinary."})
-    return jsonify({"status": "error", "message": "Failed to rebuild index. Check logs."}), 500
+    return jsonify({"status": "error", "message": "Failed to rebuild index. Check logs for details."}), 500
 
 # --- APPLICATION STARTUP ---
 with app.app_context():
     if download_pdfs_from_cloudinary():
         pdf_index = load_index()
-        if pdf_index is None: print("\nCould not start the server due to an indexing error.")
-        else: print("\nIndex loaded successfully. Application is ready.")
+        if pdf_index is None:
+            print("\nCould not start the server due to an indexing error.")
+        else:
+            print("\nIndex loaded successfully. Application is ready.")
     else:
         print("\nFATAL: Could not download PDFs from Cloudinary. The application cannot start correctly.")
         pdf_index = {}
