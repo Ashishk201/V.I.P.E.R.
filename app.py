@@ -1,4 +1,4 @@
-# app.py (with Health Check & Deep Logging)
+# app.py (Final Folder Search Fix)
 
 import os
 import re
@@ -42,7 +42,7 @@ else:
 
 def download_pdfs_from_cloudinary():
     """
-    Connects to Cloudinary, fetches all PDFs, and saves them to the local PDF_DIRECTORY.
+    Connects to Cloudinary, fetches all PDFs from a specific folder, and saves them locally.
     """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
@@ -50,32 +50,22 @@ def download_pdfs_from_cloudinary():
 
     print("Connecting to Cloudinary to download PDFs...")
     try:
-        resources = cloudinary.api.resources(
-            type="upload",
-            resource_type="raw",
-            prefix="pdfs/",
-            max_results=500
-        )
+        # --- MODIFIED: Using a more robust search expression to find files in a specific folder ---
+        expression = 'folder=pdfs'
+        print(f"Using Cloudinary search expression: '{expression}'")
         
-        # ADDED: Deep logging to inspect the entire API response
-        print(f"Full Cloudinary API response: {resources}")
+        resources = cloudinary.Search().expression(expression).max_results(500).execute()
         
         num_found = len(resources.get('resources', []))
-        print(f"Cloudinary API call successful. Found {num_found} resources in 'pdfs/' folder.")
+        print(f"Cloudinary API call successful. Found {num_found} resources using search.")
 
         if num_found == 0:
-            print("Warning: No files were found. Please double-check the folder name and file locations in your Cloudinary Media Library.")
+            print("Warning: No files were found. Please ensure your files are uploaded to a folder named exactly 'pdfs' in your Cloudinary Media Library.")
             return False
 
         for resource in resources.get('resources', []):
             file_url = resource['secure_url']
-            # Robust filename creation
-            public_id = resource['public_id']
-            file_format = resource.get('format', '')
-            filename = os.path.basename(public_id)
-            if file_format:
-                filename = f"{filename}.{file_format}"
-
+            filename = resource['filename'] + '.' + resource.get('format', 'pdf')
             filepath = os.path.join(PDF_DIRECTORY, filename)
             
             print(f"Downloading {filename}...")
@@ -147,13 +137,12 @@ def load_index():
     print("No index file found. Creating a new one.")
     return create_index()
 
-# --- FLASK ROUTES ---
+# --- FLASK ROUTES (Unchanged) ---
 
 @app.route('/')
 def serve_index_page():
     return send_from_directory('.', 'index.html')
 
-# ADDED: Health check endpoint for debugging
 @app.route('/health')
 def health_check():
     index_size = len(pdf_index.keys())
