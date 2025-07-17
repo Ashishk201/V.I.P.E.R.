@@ -1,4 +1,4 @@
-# app.py (Final Robust Version)
+# app.py (Final Targeted Fix)
 
 import os
 import re
@@ -24,16 +24,16 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 # --- CLOUDINARY SETUP ---
-# Read credentials from environment variables
 cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME')
 api_key = os.environ.get('CLOUDINARY_API_KEY')
 api_secret = os.environ.get('CLOUDINARY_API_SECRET')
 
-# Add a check and log to ensure variables are loaded
 if not all([cloud_name, api_key, api_secret]):
-    print("FATAL ERROR: Cloudinary environment variables are not set. Please check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in Render.")
+    print("FATAL ERROR: Cloudinary environment variables are not set.")
 else:
+    # ADDED: Log partial credentials to confirm they are being read
     print(f"Cloudinary configured for cloud_name: {cloud_name}")
+    print(f"API Key loaded, starts with: {api_key[:4]}...")
     cloudinary.config(
         cloud_name=cloud_name,
         api_key=api_key,
@@ -44,7 +44,6 @@ else:
 def download_pdfs_from_cloudinary():
     """
     Connects to Cloudinary, fetches all PDFs, and saves them to the local PDF_DIRECTORY.
-    This version is more robust and has better logging.
     """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
@@ -52,11 +51,11 @@ def download_pdfs_from_cloudinary():
 
     print("Connecting to Cloudinary to download PDFs...")
     try:
-        # MODIFIED: Removed 'resource_type' to be more flexible.
-        # This will find any file type inside the 'pdfs/' folder.
+        # MODIFIED: Added resource_type='raw' back in. This is a critical and specific change.
         resources = cloudinary.api.resources(
             type="upload",
-            prefix="pdfs",  # Make sure your PDFs are in a 'pdfs' folder in Cloudinary
+            resource_type="raw",  # Explicitly look for raw files like PDFs
+            prefix="pdfs/",
             max_results=500
         )
         
@@ -64,19 +63,15 @@ def download_pdfs_from_cloudinary():
         print(f"Cloudinary API call successful. Found {num_found} resources in 'pdfs/' folder.")
 
         if num_found == 0:
-            print("Warning: No files were found. Please ensure your files are uploaded to a folder named exactly 'pdfs' in your Cloudinary Media Library.")
+            print("Warning: No files were found. Please double-check the folder name and file locations in your Cloudinary Media Library.")
             return False
 
         for resource in resources.get('resources', []):
             file_url = resource['secure_url']
-            # Create a filename that includes the extension
-            filename = f"{resource['public_id']}.{resource.get('format', 'pdf')}"
-            # Remove the folder path from the filename
-            filename = os.path.basename(filename)
+            filename = os.path.basename(resource['public_id']) + '.' + resource.get('format', 'pdf')
             filepath = os.path.join(PDF_DIRECTORY, filename)
             
             print(f"Downloading {filename}...")
-            
             response = requests.get(file_url, stream=True)
             response.raise_for_status()
 
