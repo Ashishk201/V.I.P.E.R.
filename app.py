@@ -1,4 +1,4 @@
-# app.py (Signed URL Fix)
+# app.py (Correct Signed URL Fix)
 
 import os
 import re
@@ -6,7 +6,7 @@ import json
 import io
 import cloudinary
 import cloudinary.api
-import cloudinary.utils  # Import the utils library for signing URLs
+import cloudinary.utils  # Ensure utils is imported for signing
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -33,7 +33,6 @@ if not all([cloud_name, api_key, api_secret]):
     print("FATAL ERROR: Cloudinary environment variables are not set.")
 else:
     print(f"Cloudinary configured for cloud_name: {cloud_name}")
-    print(f"API Key loaded, starts with: {api_key[:4]}...")
     cloudinary.config(
         cloud_name=cloud_name,
         api_key=api_key,
@@ -43,8 +42,7 @@ else:
 
 def download_pdfs_from_cloudinary():
     """
-    Connects to Cloudinary, fetches all PDFs from a specific folder, and saves them locally.
-    This version generates signed URLs to prevent 401 errors.
+    Connects to Cloudinary, generates a signed URL for each private asset, and downloads it.
     """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
@@ -54,33 +52,32 @@ def download_pdfs_from_cloudinary():
     try:
         expression = 'folder=pdfs'
         print(f"Using Cloudinary search expression: '{expression}'")
-        
         resources = cloudinary.Search().expression(expression).max_results(500).execute()
         
         num_found = len(resources.get('resources', []))
-        print(f"Cloudinary API call successful. Found {num_found} resources using search.")
+        print(f"Cloudinary API call successful. Found {num_found} resources.")
 
         if num_found == 0:
-            print("Warning: No files were found. Please ensure your files are uploaded to a folder named exactly 'pdfs' in your Cloudinary Media Library.")
+            print("Warning: No files were found in the 'pdfs' folder.")
             return False
 
         for resource in resources.get('resources', []):
             public_id = resource['public_id']
             file_format = resource.get('format', 'pdf')
             
-            # --- MODIFIED: Generate a signed URL for download ---
-            # This creates a URL with a temporary authentication token.
+            # --- CORRECTED SIGNED URL LOGIC ---
+            # We explicitly force resource_type="raw" to ensure the URL is for a generic
+            # file, not an image. This prevents the '/image/upload/' error.
             download_url = cloudinary.utils.cloudinary_url(
-                public_id, 
-                resource_type="raw", 
-                sign_url=True,
-                format=file_format
+                public_id,
+                resource_type="raw",
+                sign_url=True
             )[0]
 
             filename = resource['filename'] + '.' + file_format
             filepath = os.path.join(PDF_DIRECTORY, filename)
             
-            print(f"Downloading {filename}...")
+            print(f"Downloading {filename} from signed URL...")
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
