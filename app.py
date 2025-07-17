@@ -1,4 +1,4 @@
-# app.py (Correct Signed URL Fix)
+# app.py (Final 404 Fix)
 
 import os
 import re
@@ -6,7 +6,7 @@ import json
 import io
 import cloudinary
 import cloudinary.api
-import cloudinary.utils  # Ensure utils is imported for signing
+import cloudinary.utils
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -42,7 +42,8 @@ else:
 
 def download_pdfs_from_cloudinary():
     """
-    Connects to Cloudinary, generates a signed URL for each private asset, and downloads it.
+    Connects to Cloudinary, fetches all PDFs from a specific folder, and saves them locally.
+    This version correctly constructs the public_id for signing.
     """
     if not os.path.exists(PDF_DIRECTORY):
         os.makedirs(PDF_DIRECTORY)
@@ -62,22 +63,29 @@ def download_pdfs_from_cloudinary():
             return False
 
         for resource in resources.get('resources', []):
-            public_id = resource['public_id']
-            file_format = resource.get('format', 'pdf')
+            # --- DEFINITIVE FIX for 404 ERROR ---
+            # Manually construct the full public_id from the folder and filename.
+            # This ensures the path is correct before signing.
+            folder = resource.get('folder', '')
+            filename_no_ext = resource.get('filename')
             
-            # --- CORRECTED SIGNED URL LOGIC ---
-            # We explicitly force resource_type="raw" to ensure the URL is for a generic
-            # file, not an image. This prevents the '/image/upload/' error.
+            if not filename_no_ext:
+                print(f"Skipping resource with no filename: {resource}")
+                continue
+
+            full_public_id = f"{folder}/{filename_no_ext}" if folder else filename_no_ext
+            
             download_url = cloudinary.utils.cloudinary_url(
-                public_id,
+                full_public_id,
                 resource_type="raw",
                 sign_url=True
             )[0]
 
-            filename = resource['filename'] + '.' + file_format
-            filepath = os.path.join(PDF_DIRECTORY, filename)
+            # Use the original filename for saving locally
+            local_filename = resource['filename'] + '.' + resource.get('format', 'pdf')
+            filepath = os.path.join(PDF_DIRECTORY, local_filename)
             
-            print(f"Downloading {filename} from signed URL...")
+            print(f"Downloading {local_filename}...")
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
@@ -85,7 +93,7 @@ def download_pdfs_from_cloudinary():
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             
-            print(f"Successfully downloaded {filename}.")
+            print(f"Successfully downloaded {local_filename}.")
         
         print("All PDFs downloaded successfully from Cloudinary.")
         return True
