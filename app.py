@@ -1,4 +1,4 @@
-# app.py (Final Targeted Fix)
+# app.py (with Health Check & Deep Logging)
 
 import os
 import re
@@ -31,7 +31,6 @@ api_secret = os.environ.get('CLOUDINARY_API_SECRET')
 if not all([cloud_name, api_key, api_secret]):
     print("FATAL ERROR: Cloudinary environment variables are not set.")
 else:
-    # ADDED: Log partial credentials to confirm they are being read
     print(f"Cloudinary configured for cloud_name: {cloud_name}")
     print(f"API Key loaded, starts with: {api_key[:4]}...")
     cloudinary.config(
@@ -51,13 +50,15 @@ def download_pdfs_from_cloudinary():
 
     print("Connecting to Cloudinary to download PDFs...")
     try:
-        # MODIFIED: Added resource_type='raw' back in. This is a critical and specific change.
         resources = cloudinary.api.resources(
             type="upload",
-            resource_type="raw",  # Explicitly look for raw files like PDFs
+            resource_type="raw",
             prefix="pdfs/",
             max_results=500
         )
+        
+        # ADDED: Deep logging to inspect the entire API response
+        print(f"Full Cloudinary API response: {resources}")
         
         num_found = len(resources.get('resources', []))
         print(f"Cloudinary API call successful. Found {num_found} resources in 'pdfs/' folder.")
@@ -68,7 +69,13 @@ def download_pdfs_from_cloudinary():
 
         for resource in resources.get('resources', []):
             file_url = resource['secure_url']
-            filename = os.path.basename(resource['public_id']) + '.' + resource.get('format', 'pdf')
+            # Robust filename creation
+            public_id = resource['public_id']
+            file_format = resource.get('format', '')
+            filename = os.path.basename(public_id)
+            if file_format:
+                filename = f"{filename}.{file_format}"
+
             filepath = os.path.join(PDF_DIRECTORY, filename)
             
             print(f"Downloading {filename}...")
@@ -140,11 +147,21 @@ def load_index():
     print("No index file found. Creating a new one.")
     return create_index()
 
-# --- FLASK ROUTES (Unchanged) ---
+# --- FLASK ROUTES ---
 
 @app.route('/')
 def serve_index_page():
     return send_from_directory('.', 'index.html')
+
+# ADDED: Health check endpoint for debugging
+@app.route('/health')
+def health_check():
+    index_size = len(pdf_index.keys())
+    status = "OK" if index_size > 0 else "WARNING: INDEX IS EMPTY"
+    return jsonify({
+        "status": status,
+        "indexed_roll_numbers": index_size
+    })
 
 @app.route('/search')
 def search_roll_number():
